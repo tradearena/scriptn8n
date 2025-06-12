@@ -55,6 +55,7 @@ async def calcular_ordens(ordens: List[Ordem]):
             total_emolumentos = 0
             total_qtd_compra = 0
             total_qtd_venda = 0
+            total_ordens = len(grupo_usuario)
 
             ativos = grupo_usuario['AtivoPrefixo'].unique()
             for ativo in ativos:
@@ -97,6 +98,7 @@ async def calcular_ordens(ordens: List[Ordem]):
 
             resultados.append({
                 'token': usuario,
+                'ordens': int(total_ordens),
                 'contratos': int(total_contratos),
                 'resultado_fechado': round(total_resultado_fechado, 2),
                 'resultado_aberto': round(total_resultado_aberto, 2),
