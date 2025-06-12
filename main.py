@@ -16,7 +16,10 @@ class Ordem(BaseModel):
     groupOrderId: str
     quantity: int
     token: int
-
+    
+@app.get("/")
+def raiz():
+    return {"mensagem": "🚀 API de cálculo de ordens está ativa! Endpoint POST /calcular"}
 @app.post("/calcular")
 async def calcular_ordens(ordens: List[Ordem]):
     if not ordens:
