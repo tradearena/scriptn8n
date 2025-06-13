@@ -17,10 +17,19 @@ async def calcular_raiz(request: Request):
 @app.post("/calcular-resultado")
 async def calcular_resultado(request: Request):
     try:
-        body = await request.json()
-        orders = body.get("orders", [])
+        json_data = await request.json()
+
+        # Aceita tanto lista quanto dict com "orders"
+        if isinstance(json_data, list):
+            orders = json_data
+        elif isinstance(json_data, dict) and "orders" in json_data:
+            orders = json_data["orders"]
+        else:
+            return {"erro": "Formato de JSON inválido. Envie um array ou um objeto com 'orders'."}
+
         if not orders:
-            return {"erro": "JSON inválido ou sem campo 'orders'"}
+            return {"erro": "Lista de ordens vazia."}
+
     except Exception as e:
         return {"erro": f"Erro ao processar JSON: {str(e)}"}
 
