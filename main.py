@@ -16,71 +16,82 @@ async def calcular_raiz(request: Request):
 
 @app.post("/calcular-resultado")
 async def calcular_resultado(request: Request):
-    body = await request.json()
-    orders = body.get("orders", [])
-    if not orders:
-        return {"erro": "JSON inválido ou sem campo 'orders'"}
+    try:
+        body = await request.json()
+        orders = body.get("orders", [])
+        if not orders:
+            return {"erro": "JSON inválido ou sem campo 'orders'"}
+    except Exception as e:
+        return {"erro": f"Erro ao processar JSON: {str(e)}"}
 
-    df = pd.DataFrame(orders)
-    df['dateTime'] = pd.to_datetime(df['dateTime'])
-    df['side'] = df['side'].map({'0': 'COMPRA', '1': 'VENDA'})
-    df['AtivoPrefixo'] = df['code'].str[:3]
-    df['token'] = df['token'].astype(str)
+    try:
+        df = pd.DataFrame(orders)
+        df['dateTime'] = pd.to_datetime(df['dateTime'], errors='coerce')
+        df['side'] = df['side'].map({'0': 'COMPRA', '1': 'VENDA'})
+        df['AtivoPrefixo'] = df['code'].str[:3]
+        df['token'] = df['token'].astype(str)
 
-    ultimo_preco_por_ativo = df.sort_values('dateTime').groupby('code')['price'].last().to_dict()
-    resultados = []
+        ultimo_preco_por_ativo = df.sort_values('dateTime').groupby('code')['price'].last().to_dict()
+        resultados = []
 
-    for usuario, grupo in df.groupby('token'):
-        lucro_total = 0
-        custo_total = 0
-        qtd_total = 0
-        ordens = len(grupo)
-        qtd_compra_total = 0
-        qtd_venda_total = 0
+        for usuario, grupo in df.groupby('token'):
+            lucro_total = 0
+            custo_total = 0
+            qtd_total = 0
+            ordens = len(grupo)
+            qtd_compra_total = 0
+            qtd_venda_total = 0
 
-        for ativo, subgrupo in grupo.groupby('AtivoPrefixo'):
-            mult = multiplicadores.get(ativo, 0)
-            taxa_emol = emolumentos.get(ativo, 0)
+            for ativo, subgrupo in grupo.groupby('AtivoPrefixo'):
+                mult = multiplicadores.get(ativo, 0)
+                taxa_emol = emolumentos.get(ativo, 0)
 
-            compras = subgrupo[subgrupo['side'] == 'COMPRA']
-            vendas = subgrupo[subgrupo['side'] == 'VENDA']
+                compras = subgrupo[subgrupo['side'] == 'COMPRA']
+                vendas = subgrupo[subgrupo['side'] == 'VENDA']
 
-            qtd_buy = compras['quantity'].sum()
-            qtd_sell = vendas['quantity'].sum()
-            qtd_total_ativo = subgrupo['quantity'].sum()
-            qtd_base = min(qtd_buy, qtd_sell)
-            qtd_aberta = abs(qtd_buy - qtd_sell)
+                qtd_buy = compras['quantity'].sum()
+                qtd_sell = vendas['quantity'].sum()
+                qtd_total_ativo = subgrupo['quantity'].sum()
+                qtd_base = min(qtd_buy, qtd_sell)
+                qtd_aberta = abs(qtd_buy - qtd_sell)
 
-            preco_medio_buy = (compras['quantity'] * compras['price']).sum() / qtd_buy if qtd_buy > 0 else 0
-            preco_medio_sell = (vendas['quantity'] * vendas['price']).sum() / qtd_sell if qtd_sell > 0 else 0
+                preco_medio_buy = (compras['quantity'] * compras['price']).sum() / qtd_buy if qtd_buy > 0 else 0
+                preco_medio_sell = (vendas['quantity'] * vendas['price']).sum() / qtd_sell if qtd_sell > 0 else 0
 
-            resultado_fechado = (preco_medio_sell - preco_medio_buy) * qtd_base * mult
+                resultado_fechado = (preco_medio_sell - preco_medio_buy) * qtd_base * mult
 
-            ultimo_preco = ultimo_preco_por_ativo.get(subgrupo['code'].iloc[0], 0)
-            if qtd_buy > qtd_sell:
-                resultado_em_aberto = (ultimo_preco - preco_medio_buy) * qtd_aberta * mult
-            elif qtd_sell > qtd_buy:
-                resultado_em_aberto = (preco_medio_sell - ultimo_preco) * qtd_aberta * mult
-            else:
-                resultado_em_aberto = 0
+                try:
+                    ultimo_preco = ultimo_preco_por_ativo.get(subgrupo['code'].iloc[0], 0)
+                except:
+                    ultimo_preco = 0
 
-            resultado_total = resultado_fechado + resultado_em_aberto
-            custo_emol = qtd_total_ativo * taxa_emol
+                if qtd_buy > qtd_sell:
+                    resultado_em_aberto = (ultimo_preco - preco_medio_buy) * qtd_aberta * mult
+                elif qtd_sell > qtd_buy:
+                    resultado_em_aberto = (preco_medio_sell - ultimo_preco) * qtd_aberta * mult
+                else:
+                    resultado_em_aberto = 0
 
-            lucro_total += resultado_total
-            custo_total += custo_emol
-            qtd_total += qtd_total_ativo
-            qtd_compra_total += qtd_buy
-            qtd_venda_total += qtd_sell
+                resultado_total = resultado_fechado + resultado_em_aberto
+                custo_emol = qtd_total_ativo * taxa_emol
 
-        resultados.append({
-            "token": usuario,
-            "lucroBruto": round(lucro_total, 2),
-            "lucroLiquido": round(lucro_total - custo_total, 2),
-            "qtdeOrdens": ordens,
-            "qtdeContratos": qtd_total,
-            "qtdeCompra": qtd_compra_total,
-            "qtdeVenda": qtd_venda_total
-        })
+                lucro_total += resultado_total
+                custo_total += custo_emol
+                qtd_total += qtd_total_ativo
+                qtd_compra_total += qtd_buy
+                qtd_venda_total += qtd_sell
 
-    return resultados
+            resultados.append({
+                "token": usuario,
+                "lucroBruto": round(lucro_total, 2),
+                "lucroLiquido": round(lucro_total - custo_total, 2),
+                "qtdeOrdens": ordens,
+                "qtdeContratos": qtd_total,
+                "qtdeCompra": qtd_compra_total,
+                "qtdeVenda": qtd_venda_total
+            })
+
+        return resultados
+
+    except Exception as e:
+        return {"erro": f"Erro interno durante o cálculo: {str(e)}"}
