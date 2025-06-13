@@ -1,39 +1,27 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import List
+from fastapi import FastAPI, Request
 import pandas as pd
 
 app = FastAPI()
 
-# Configurações fixas
 multiplicadores = {'WIN': 0.2, 'WDO': 10.0, 'BIT': 0.1}
 emolumentos = {'WIN': 0.25, 'WDO': 1.20, 'BIT': 3.00}
 
-# Modelos
-class Order(BaseModel):
-    code: str
-    side: str  # "0" para compra, "1" para venda
-    dateTime: str
-    price: float
-    tradeId: str
-    groupOrderId: str
-    quantity: int
-    token: int
-
-class OrdersPayload(BaseModel):
-    orders: List[Order]
-
 @app.get("/")
 def ping():
-    return {"mensagem": "✅ API ativa. Use POST / ou /calcular-resultado"}
+    return {"mensagem": "API ativa. Use POST / ou /calcular-resultado"}
 
 @app.post("/")
-async def calcular_raiz(payload: OrdersPayload):
-    return await calcular_resultado(payload)
+async def calcular_raiz(request: Request):
+    return await calcular_resultado(request)
 
 @app.post("/calcular-resultado")
-async def calcular_resultado(payload: OrdersPayload):
-    df = pd.DataFrame([order.dict() for order in payload.orders])
+async def calcular_resultado(request: Request):
+    body = await request.json()
+    orders = body.get("orders", [])
+    if not orders:
+        return {"erro": "JSON inválido ou sem campo 'orders'"}
+
+    df = pd.DataFrame(orders)
     df['dateTime'] = pd.to_datetime(df['dateTime'])
     df['side'] = df['side'].map({'0': 'COMPRA', '1': 'VENDA'})
     df['AtivoPrefixo'] = df['code'].str[:3]
