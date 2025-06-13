@@ -1,16 +1,18 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from typing import List
 import pandas as pd
 
 app = FastAPI()
 
-# Multiplicadores e taxas
+# Configurações fixas
 multiplicadores = {'WIN': 0.2, 'WDO': 10.0, 'BIT': 0.1}
 emolumentos = {'WIN': 0.25, 'WDO': 1.20, 'BIT': 3.00}
 
+# Modelos
 class Order(BaseModel):
     code: str
-    side: str  # "0" ou "1"
+    side: str  # "0" para compra, "1" para venda
     dateTime: str
     price: float
     tradeId: str
@@ -19,7 +21,15 @@ class Order(BaseModel):
     token: int
 
 class OrdersPayload(BaseModel):
-    orders: list[Order]
+    orders: List[Order]
+
+@app.get("/")
+def ping():
+    return {"mensagem": "✅ API ativa. Use POST / ou /calcular-resultado"}
+
+@app.post("/")
+async def calcular_raiz(payload: OrdersPayload):
+    return await calcular_resultado(payload)
 
 @app.post("/calcular-resultado")
 async def calcular_resultado(payload: OrdersPayload):
