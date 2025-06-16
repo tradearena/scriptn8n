@@ -38,6 +38,7 @@ async def calcular_resultado(request: Request):
         df['dateTime'] = pd.to_datetime(df['dateTime'], errors='coerce')
         df['side'] = df['side'].map({'0': 'COMPRA', '1': 'VENDA'})
         df['AtivoPrefixo'] = df['code'].str[:3]
+        df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')
         df['token'] = df['token'].astype(str)
 
         ultimo_preco_por_ativo = df.sort_values('dateTime').groupby('code')['price'].last().to_dict()
