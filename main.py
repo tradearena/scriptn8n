@@ -1,26 +1,39 @@
 from fastapi import FastAPI, Request
 import pandas as pd
 import traceback
+import numpy as np
 
 app = FastAPI()
 
 multiplicadores = {'WIN': 0.2, 'WDO': 10.0, 'BIT': 0.1}
 emolumentos = {'WIN': 0.25, 'WDO': 1.20, 'BIT': 3.00}
 
+
+def convert_numpy(obj):
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    elif isinstance(obj, (np.floating,)):
+        return float(obj)
+    elif isinstance(obj, (np.ndarray,)):
+        return obj.tolist()
+    return obj
+
+
 @app.get("/")
 def ping():
     return {"mensagem": "API ativa. Use POST / ou /calcular-resultado"}
 
+
 @app.post("/")
 async def calcular_raiz(request: Request):
     return await calcular_resultado(request)
+
 
 @app.post("/calcular-resultado")
 async def calcular_resultado(request: Request):
     try:
         json_data = await request.json()
 
-        # Aceita tanto lista quanto dict com "orders"
         if isinstance(json_data, list):
             orders = json_data
         elif isinstance(json_data, dict) and "orders" in json_data:
@@ -103,6 +116,12 @@ async def calcular_resultado(request: Request):
                 "qtdeCompra": qtd_compra_total,
                 "qtdeVenda": qtd_venda_total
             })
+
+        # Conversão para tipos nativos Python
+        resultados = [
+            {k: convert_numpy(v) for k, v in resultado.items()}
+            for resultado in resultados
+        ]
 
         return resultados
 
