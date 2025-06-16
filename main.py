@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Request
 import pandas as pd
+import traceback
 
 app = FastAPI()
 
@@ -38,8 +39,10 @@ async def calcular_resultado(request: Request):
         df['dateTime'] = pd.to_datetime(df['dateTime'], errors='coerce')
         df['side'] = df['side'].map({'0': 'COMPRA', '1': 'VENDA'})
         df['AtivoPrefixo'] = df['code'].str[:3]
-        df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')
         df['token'] = df['token'].astype(str)
+        df['quantity'] = pd.to_numeric(df['quantity'], errors='coerce')
+        df['price'] = pd.to_numeric(df['price'], errors='coerce')
+        df = df.dropna(subset=['quantity', 'price', 'dateTime', 'side', 'code'])
 
         ultimo_preco_por_ativo = df.sort_values('dateTime').groupby('code')['price'].last().to_dict()
         resultados = []
@@ -104,4 +107,5 @@ async def calcular_resultado(request: Request):
         return resultados
 
     except Exception as e:
+        print(traceback.format_exc())
         return {"erro": f"Erro interno durante o cálculo: {str(e)}"}
